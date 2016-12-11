@@ -1,0 +1,3 @@
+
+
+const RowCreator = ({ amountOfColumns }) => null;
