@@ -23,4 +23,4 @@ const ContentSerializer = (key, value) => {
   return value;
 };
 
-export { ContentRecord };
+export { ContentRecord, ContentSerializer };

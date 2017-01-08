@@ -30,7 +30,7 @@ class AppComponent extends React.Component {
         columns={4}
         rows={4}
         components={
-          this.state.store.currentState.get('content')
+          this.state.store.currentState.content
         }
       />
     );

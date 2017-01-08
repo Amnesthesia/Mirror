@@ -1,10 +1,10 @@
 import { default as React } from 'react';
-import { Map, List, Set } from 'immutable';
+import { Map, List, Set, Record } from 'immutable';
 import * as Widgets from '../widgets';
 
 import { Column } from './Column';
 
-const ComponentGridModifications = (components, rows, columns) => {
+const Grid = ({ rows, columns, components = new List() }) => {
 
   const defaultStyle = new Map({
     width: Math.floor(100/columns),
@@ -14,126 +14,108 @@ const ComponentGridModifications = (components, rows, columns) => {
     right: 0
   });
 
-  // Generate the grid as a Map with default style
-  let gridColumns = new Map(
-    Array.apply(null, { length: rows * columns })
+
+  let defaultGrid = new Map(
+    Array.apply(null, { length: rows })
          .map(Number.call, Number)
-         .reduce((current, next) => (Object.assign(current, {[next]: new Map({ style: defaultStyle, components: new Set(), componentParameters: new Set(), orientation: 'NORMAL' }) })), {})
+         .map((row) =>
+           new Map(
+             Array.apply(null, { length: columns })
+                  .map(Number.call, Number)
+                  .reduce((current, next, columnIndex) => (
+                    Object.assign(current,
+                      {
+                        [next]: new Map({
+                          style: new Map(Object.assign({}, defaultStyle.toObject(), {
+                            top: defaultStyle.get('height') * row + '%',
+                            left: defaultStyle.get('width') * columnIndex + '%',
+                            width: defaultStyle.get('width') + '%',
+                            height: defaultStyle.get('height') + '%',
+                          })),
+                          components: new Set(),
+                          orientation: 'NORMAL',
+                          disabled: false
+                        })
+                      })),
+                    {})
+           )
+         )
+         .reduce((current, next, rowIndex) => (Object.assign(current, { [rowIndex]: next })), {})
   );
 
-  gridColumns = gridColumns.map((item, key) => {
-    return item.setIn(['style', 'top'], (item.getIn(['style', 'height']) * Math.floor(key / columns)) + '%')
-               .setIn(['style', 'left'], (item.getIn(['style', 'width']) * Math.floor(key % columns)) + '%')
-  });
 
+  if(!components.isEmpty())
+  {
+    components.forEach(component => {
+      const componentItem = component.toObject();
 
-  if(components.count())
-    components.map(itm => {
-      var item = itm.toObject();
+      const firstColumn = {
+        row: componentItem.placement.first() === 0 ?  componentItem.placement.first() : (Math.floor(columns/componentItem.placement.first()) - 1),
+        column: (componentItem.placement.first() % columns),
+        number: componentItem.placement.first()
+      };
 
-      if (item.placement.count() > 1) {
-        let firstColumn = item.placement.first();
-        let lastColumn = item.placement.last();
+      const lastColumn = {
+        row: componentItem.placement.first() === 0 ?  componentItem.placement.first() : (Math.floor(columns/componentItem.placement.first()) - 1),
+        column: (componentItem.placement.last() % columns),
+        number: componentItem.placement.last()
+      };
 
-        // If the firstColumn has already been modified before - DO NOT modify it again. Leave the style, but append the component
-        if(!gridColumns.getIn([`${firstColumn}`, 'components']).isEmpty())
-          return gridColumns.setIn([`${firstColumn}`, 'components'], gridColumns.getIn([`${firstColumn}`, 'components']).push(...item.components));
+      // Get the amount of Vertical steps from origin to remove:
+      const verticalSteps =  Math.floor(lastColumn.number / columns);
+      const horizontalSteps = Math.ceil(lastColumn.number % columns) - Math.ceil(firstColumn.number % columns);
 
+      // If the firstColumn has already been modified before - DO NOT modify it again. Leave the style, but append the component
 
-        // Get the amount of Vertical steps from origin to remove:
-        const verticalSteps = lastColumn % columns === 0 ? 2 : Math.ceil(lastColumn / columns);
-        const horizontalSteps = Math.ceil((lastColumn % columns) + 1);
+      if(!defaultGrid.getIn([`${firstColumn.row}`, `${firstColumn.column}`, 'components']).isEmpty())
+      {
+        defaultGrid = defaultGrid.setIn([`${firstColumn.row}`, `${firstColumn.column}`, 'components'],
+          defaultGrid.getIn([`${firstColumn.row}`, `${firstColumn.column}`, 'components']).push(...componentItem.components));
 
-
-        const columnsToRemove = [...Array(rows*columns).keys()].map(i => {
-
-          if(i < firstColumn)
-            return null;
-
-          if(i < firstColumn + horizontalSteps)
-            return i;
-
-          if(i > (verticalSteps*columns) + firstColumn)
-            return null;
-
-          if(i > lastColumn)
-            return null;
-
-          if(i >= columns)
-            if(i % columns < horizontalSteps)
-              return i;
-
-          return null;
-        }).filter(i => i !== null && i !== firstColumn);
-
-        console.log('Removing items: ', columnsToRemove);
-
-
-        // If the lastColumn is actually on different row, then the height should be increased to amount of rows it spans
-        if (Math.ceil(firstColumn / columns) !== Math.ceil(lastColumn/columns)){
-
-          gridColumns = gridColumns.setIn([`${firstColumn}`, 'style', 'height'], defaultStyle.get('height') * verticalSteps)
-                                   .setIn([`${firstColumn}`, 'style', 'top'], (defaultStyle.get('height') * Math.floor(firstColumn/columns) + '%'))     // Top position is the default height multiplied by the row number
-                                   .setIn([`${firstColumn}`, 'style', 'left'], (defaultStyle.get('width') * Math.floor(firstColumn % columns)) + '%')  // Left is the column number multiplied by default width
-                                   .setIn([`${firstColumn}`, 'components'], gridColumns.getIn([`${firstColumn}`, 'components']).add(...item.components))
-                                   .setIn([`${firstColumn}`, 'componentParameters'], gridColumns.getIn([`${firstColumn}`, 'componentParameters']).add(...item.componentParameters))
-                                   .setIn([`${firstColumn}`, 'orientation'], 'PORTRAIT');
-
-        }
-
-        // Check if last column is not on the same row as first column
-        if(Math.ceil(firstColumn % columns) !== Math.ceil(lastColumn % columns)) {
-
-          gridColumns = gridColumns.setIn([`${firstColumn}`, 'style', 'width'], defaultStyle.get('width') * horizontalSteps)
-                                   .setIn([`${firstColumn}`, 'components'], gridColumns.getIn([`${firstColumn}`, 'components']).add(...item.components)) // TODO: Find the actual component and not just the string here
-                                   .setIn([`${firstColumn}`, 'componentParameters'], gridColumns.getIn([`${firstColumn}`, 'componentParameters']).add(...item.componentParameters))
-                                   .setIn([`${firstColumn}`, 'style', 'top'], (defaultStyle.get('height') * Math.floor(firstColumn/columns)) + '%')
-                                   .setIn([`${firstColumn}`, 'style', 'left'], (defaultStyle.get('width') * Math.floor(firstColumn % columns)) + '%')
-                                   .setIn([`${firstColumn}`, 'orientation'], 'LANDSCAPE');
-
-
-
-        }
-
-
-        columnsToRemove.map(n => {
-          gridColumns = gridColumns.remove(`${n}`);
-        });
+        return defaultGrid;
       }
-      else{
-        let columnNumber = item.placement.first();
-        gridColumns = gridColumns.setIn([`${columnNumber}`, 'components'], gridColumns.getIn([`${columnNumber}`, 'components']).add(...item.components));
-      }
+
+
+      for(let row = firstColumn.row; row <= (firstColumn.row + verticalSteps); row++)
+        for(let column = firstColumn.column; column <= (firstColumn.column + horizontalSteps); column++)
+
+          if(row === firstColumn.row && column === firstColumn.column){
+            defaultGrid = defaultGrid.setIn([`${row}`, `${column}`, 'style', 'height'],     defaultStyle.get('height') * (verticalSteps > 0 ? verticalSteps + 1 : 1) + '%')
+                                     .setIn([`${row}`, `${column}`, 'style', 'width'],      defaultStyle.get('height') * (horizontalSteps > 0 ? horizontalSteps + 1 : 1) + '%')
+                                     .setIn([`${row}`, `${column}`, 'style', 'top'],        defaultStyle.get('height') * row + `%`)
+                                     .setIn([`${row}`, `${column}`, 'style', 'left'],       defaultStyle.get('width') * column + `%`)
+                                     .setIn([`${row}`, `${column}`, 'components'],          defaultGrid.getIn([`${row}`, `${column}`, 'components'])
+                                                                                                       .add(...componentItem.components))
+                                     .setIn([`${row}`, `${column}`, 'orientation'], horizontalSteps > verticalSteps ? 'PORTRAIT' : 'LANDSCAPE');
+          }
+         else
+           defaultGrid = defaultGrid.setIn([`${row}`, `${column}`, 'disabled'], true);
+
     });
+  }
 
-  gridColumns = gridColumns.map((item) => item.setIn(['style', 'width'], `${item.getIn(['style', 'width'])}%`).setIn(['style', 'height'], `${item.getIn(['style', 'height'])}%`));;
+  return (
+    <div className="grid" style={{height: '100%', clear: 'both'}}>
+      {
+        defaultGrid.toArray().map(row =>
+          row.toArray().map( column =>
+            column.get('disabled') === true ? null :
+              <Column style={column.get('style').toJS()}>
+                {
+                  column.get('components').toArray().map((Component, key) => {
 
-  // Ensure that, since the keys are string versions of numbers, they must come in the right order still
-  return gridColumns.keySeq().map(key => parseInt(key, 10)).sort().map(n => gridColumns.get(`${n}`));
+                    let Comp = Widgets[Component.class];
+
+                    return <Comp {...Component.parameters} />;
+                  })
+                }
+              </Column>
+          )
+        )
+      }
+    </div>
+  )
 };
 
-const Grid = ({ columns, rows, components=[] }) =>
-  <div className="grid" style={{height: '100%', clear: 'both'}}>
-    {
-      ComponentGridModifications(components, rows, columns).map( (column, key) =>
-        <Column style={column.get('style').toObject()} key={key}>
-          {
-            column.get('components').toArray().map((Component, key) => {
-
-              let parameters = {};
-              if(column.get('componentParameters').count() && column.get('componentParameters').get(Number(key)))
-                parameters = column.getIn(['componentParameters', Number(key)]);
-              else if(column.get('componentParameters').toArray().length > key)
-                parameters = column.get('componentParameters').toArray()[key];
-
-              let Comp = Widgets[Component];
-
-              return <Comp {...parameters} />;
-            })
-          }
-        </Column>
-      ).toArray()
-    }
-  </div>;
 
 export { Grid };

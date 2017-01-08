@@ -14,22 +14,30 @@ class AppStore extends ReduceStore {
         content: new List([
           new Map({
             title: 'Test',
-            components: ['Calendar'],
-            componentParameters: new List([{
-              headerFontSize: '55px',
-              bodyFontSize: '200px'
-            }]),
-            placement: new List([0, 4])
+            components: new List([
+              {
+                class: 'Calendar',
+                parameters: {
+                  headerFontSize: '55px',
+                  bodyFontSize: '200px'
+                }
+              }
+            ]),
+            placement: new List([0, 5])
           }),
 
           new Map({
             title: 'Weather',
-            components: ['Weather'],
-            componentParameters:new List([{
-              latitude: 59.9160732,
-              longitude: 10.7715068,
-              name: 'Oslo'
-            }]),
+            components: new List([
+              {
+                class: 'Weather',
+                parameters: {
+                  latitude: 59.9160732,
+                  longitude: 10.7715068,
+                  name: 'Oslo'
+                }
+              }
+            ]),
             placement: new List([2,3])
           })
         ])
